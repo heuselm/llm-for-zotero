@@ -17,6 +17,7 @@ import { registerAddonDialog } from "../utils/dialogRegistry";
 import {
   normalizeMaxTokens,
   normalizeOptionalInputTokenCap,
+  normalizeOptionalModelLoadTimeoutSeconds,
   normalizeTemperature,
 } from "../utils/normalization";
 import {
@@ -2373,6 +2374,7 @@ export async function registerPrefsScripts(_window: Window | undefined | null) {
                       temperature: existing.temperature,
                       outputTokenLimit: existing.outputTokenLimit,
                       inputTokenCap: existing.inputTokenCap,
+                      loadTimeoutSeconds: existing.loadTimeoutSeconds,
                       inputMode: existing.inputMode,
                     }
                   : undefined,
@@ -2703,6 +2705,13 @@ export async function registerPrefsScripts(_window: Window | undefined | null) {
             : "",
           "optional",
         );
+        const loadTimeoutField = makeCompactField(
+          t("Load timeout (s)"),
+          modelEntry.loadTimeoutSeconds !== undefined
+            ? `${modelEntry.loadTimeoutSeconds}`
+            : "",
+          "optional",
+        );
 
         const inputModeOptions = getModelInputModeOptionsForRuntime(
           group.authMode,
@@ -2772,12 +2781,17 @@ export async function registerPrefsScripts(_window: Window | undefined | null) {
           protocolFieldWrap.style.display = "none";
         }
 
-        advFields.append(tempField.wrap, outputLimitField, inputCapField.wrap);
+        advFields.append(
+          tempField.wrap,
+          outputLimitField,
+          inputCapField.wrap,
+          loadTimeoutField.wrap,
+        );
         if (inputModeFieldWrap) advFields.append(inputModeFieldWrap);
         advFields.append(protocolFieldWrap);
         const inputModeHelpText = inputModeFieldWrap
-          ? "Temperature: randomness (0–2)  ·  Output limit applies to one response, including hidden reasoning on some APIs; it does not limit total Agent duration  ·  Input mode: auto/text-only/vision"
-          : "Temperature: randomness (0–2)  ·  Output limit applies to one response, including hidden reasoning on some APIs; it does not limit total Agent duration";
+          ? "Temperature: randomness (0–2)  ·  Output limit applies to one response, including hidden reasoning on some APIs; it does not limit total Agent duration  ·  Load timeout: seconds to wait for a local server (LM Studio, Ollama) to load the model before internal requests give up  ·  Input mode: auto/text-only/vision"
+          : "Temperature: randomness (0–2)  ·  Output limit applies to one response, including hidden reasoning on some APIs; it does not limit total Agent duration  ·  Load timeout: seconds to wait for a local server (LM Studio, Ollama) to load the model before internal requests give up";
         advRow.append(advFields, prefHint(doc, t(inputModeHelpText)));
 
         // ── Capability, reasoning and extra-parameter controls ───────────
@@ -2848,6 +2862,14 @@ export async function registerPrefsScripts(_window: Window | undefined | null) {
           modelEntry.inputTokenCap = normalizeOptionalInputTokenCap(
             inputCapField.input.value,
           );
+          const nextLoadTimeout = normalizeOptionalModelLoadTimeoutSeconds(
+            loadTimeoutField.input.value,
+          );
+          if (nextLoadTimeout) {
+            modelEntry.loadTimeoutSeconds = nextLoadTimeout;
+          } else {
+            delete modelEntry.loadTimeoutSeconds;
+          }
           const nextInputMode = inputModeSelect
             ? normalizeModelInputModeForRuntime(
                 inputModeSelect.value,
@@ -2877,6 +2899,10 @@ export async function registerPrefsScripts(_window: Window | undefined | null) {
             modelEntry.inputTokenCap !== undefined
               ? `${modelEntry.inputTokenCap}`
               : "";
+          loadTimeoutField.input.value =
+            modelEntry.loadTimeoutSeconds !== undefined
+              ? `${modelEntry.loadTimeoutSeconds}`
+              : "";
           if (inputModeSelect) {
             inputModeSelect.value = resolveModelInputMode(
               normalizeModelInputModeForRuntime(
@@ -2887,7 +2913,7 @@ export async function registerPrefsScripts(_window: Window | undefined | null) {
           }
           persistGroups(groups);
         };
-        for (const f of [tempField, inputCapField]) {
+        for (const f of [tempField, inputCapField, loadTimeoutField]) {
           f.input.addEventListener("change", () => commitAdvanced());
           f.input.addEventListener("blur", () => commitAdvanced());
         }
@@ -2901,7 +2927,7 @@ export async function registerPrefsScripts(_window: Window | undefined | null) {
           const hasModel = Boolean(modelEntry.model.trim());
           advGearBtn.disabled = !hasModel;
           advGearBtn.style.opacity = hasModel ? "1" : "0.45";
-          for (const f of [tempField, inputCapField])
+          for (const f of [tempField, inputCapField, loadTimeoutField])
             f.input.disabled = !hasModel;
           outputLimitSelect.disabled = !hasModel || outputLimitIsRuntimeManaged;
           outputLimitInput.disabled =
