@@ -3,7 +3,9 @@ import {
   normalizeInputTokenCap,
   normalizeMaxTokens,
   normalizeOptionalInputTokenCap,
+  normalizeOptionalModelLoadTimeoutSeconds,
   normalizeTemperature,
+  MAX_MODEL_LOAD_TIMEOUT_SECONDS,
 } from "../src/utils/normalization";
 import {
   DEFAULT_INPUT_TOKEN_CAP,
@@ -89,6 +91,24 @@ describe("normalization", function () {
       assert.equal(
         normalizeOptionalInputTokenCap(MAX_ALLOWED_INPUT_TOKEN_CAP + 99),
         MAX_ALLOWED_INPUT_TOKEN_CAP,
+      );
+    });
+  });
+
+  describe("normalizeOptionalModelLoadTimeoutSeconds", function () {
+    it("treats empty or invalid input as unset", function () {
+      assert.isUndefined(normalizeOptionalModelLoadTimeoutSeconds(undefined));
+      assert.isUndefined(normalizeOptionalModelLoadTimeoutSeconds(""));
+      assert.isUndefined(normalizeOptionalModelLoadTimeoutSeconds("abc"));
+      assert.isUndefined(normalizeOptionalModelLoadTimeoutSeconds(0));
+    });
+
+    it("keeps whole seconds and clamps to the maximum", function () {
+      assert.equal(normalizeOptionalModelLoadTimeoutSeconds("90"), 90);
+      assert.equal(normalizeOptionalModelLoadTimeoutSeconds(45.7), 45);
+      assert.equal(
+        normalizeOptionalModelLoadTimeoutSeconds(99_999),
+        MAX_MODEL_LOAD_TIMEOUT_SECONDS,
       );
     });
   });

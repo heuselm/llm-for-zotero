@@ -1,6 +1,7 @@
 import { getAbortController } from "./apiHelpers";
 import { callLLM, type ChatParams } from "./llmClient";
 import type { ModelTurnOutcome } from "../shared/llm";
+import { resolveModelLoadTimeoutFloorMs } from "./modelLoadTimeout";
 
 /** Default bound for short, internal model calls. */
 export const DEFAULT_LLM_CALL_TIMEOUT_MS = 10_000;
@@ -22,7 +23,15 @@ export async function callLLMWithTimeout(
   params: LLMCallWithTimeoutParams,
 ): Promise<ModelTurnOutcome> {
   const { parentSignal, timeoutMs, llmCall, ...chatParams } = params;
-  const budgetMs = timeoutMs || DEFAULT_LLM_CALL_TIMEOUT_MS;
+  // A model's configured load timeout raises the caller's budget so a local
+  // server can finish loading the model instead of having the load aborted.
+  const budgetMs = Math.max(
+    timeoutMs || DEFAULT_LLM_CALL_TIMEOUT_MS,
+    resolveModelLoadTimeoutFloorMs({
+      apiBase: chatParams.apiBase,
+      model: chatParams.model,
+    }),
+  );
   const createAbortError = () => {
     const error = new Error("LLM call aborted");
     error.name = "AbortError";

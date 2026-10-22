@@ -86,3 +86,23 @@ export function normalizeOptionalInputTokenCap(
   if (!Number.isFinite(parsed) || parsed < 1) return undefined;
   return Math.min(parsed, MAX_ALLOWED_INPUT_TOKEN_CAP);
 }
+
+/** Longest model load timeout a user can set, in seconds (10 minutes). */
+export const MAX_MODEL_LOAD_TIMEOUT_SECONDS = 600;
+
+/**
+ * Normalize an optional per-model load timeout in whole seconds. Empty,
+ * non-numeric or non-positive input means "not set".
+ */
+export function normalizeOptionalModelLoadTimeoutSeconds(
+  value?: number | string | null,
+): number | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value === "string" && !value.trim()) return undefined;
+  const parsed =
+    typeof value === "string"
+      ? Number.parseInt(value, 10)
+      : Math.floor(Number(value));
+  if (!Number.isFinite(parsed) || parsed < 1) return undefined;
+  return Math.min(parsed, MAX_MODEL_LOAD_TIMEOUT_SECONDS);
+}
