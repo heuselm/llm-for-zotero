@@ -713,6 +713,7 @@ const zhCN: Record<string, string> = {
   Temperature: "温度",
   "Max tokens": "最大 Token 数",
   "Input cap": "输入上限",
+  "Load timeout (s)": "加载超时（秒）",
   "Input mode": "输入模式",
   "Text only": "仅文本",
   "Vision allowed": "允许视觉",

@@ -3,6 +3,7 @@ import { DEFAULT_TEMPERATURE } from "./llmDefaults";
 import {
   normalizeMaxTokens,
   normalizeOptionalInputTokenCap,
+  normalizeOptionalModelLoadTimeoutSeconds,
   normalizeTemperature,
 } from "./normalization";
 import { normalizeModelInputModeForRuntime } from "./modelInputMode";
@@ -32,6 +33,7 @@ import type {
 import { CODEX_DIRECT_RESPONSES_URL } from "../codexAuth/auth";
 import { getCodexDirectCatalogSnapshot } from "../codexAuth/modelCatalog";
 import { WEBCHAT_TARGETS } from "../webchat/types";
+import { registerModelLoadTimeoutLookup } from "./modelLoadTimeout";
 
 export type LegacyModelSlotKey =
   | "primary"
@@ -44,6 +46,11 @@ export type AdvancedModelConfig = {
   outputTokenLimit: OutputTokenLimitSetting;
   inputTokenCap?: number;
   inputMode?: ModelInputMode;
+  /**
+   * Minimum time, in seconds, any bounded internal call to this model waits
+   * before giving up. For local servers that load the model on first request.
+   */
+  loadTimeoutSeconds?: number;
   /**
    * User-authored capability overrides for this model. Absent when the user has
    * not edited anything — never `{}`, so that Reset is indistinguishable from
@@ -159,6 +166,7 @@ type AdvancedModelConfigInput = {
   temperature?: number | string | null;
   outputTokenLimit?: unknown;
   inputTokenCap?: number | string | null;
+  loadTimeoutSeconds?: number | string | null;
   inputMode?: unknown;
   profileOverride?: unknown;
 };
@@ -241,6 +249,9 @@ function normalizeAdvancedModelConfig(
   // enforced where the override is consumed — `applyProfileOverride` for
   // capabilities, `resolveUserExtraBody` for request parameters.
   const profileOverride = normalizeProfileOverride(value?.profileOverride);
+  const loadTimeoutSeconds = normalizeOptionalModelLoadTimeoutSeconds(
+    value?.loadTimeoutSeconds,
+  );
   const rawOutputTokenLimit = value?.outputTokenLimit;
   const outputTokenLimit: OutputTokenLimitSetting =
     rawOutputTokenLimit &&
@@ -260,6 +271,7 @@ function normalizeAdvancedModelConfig(
     ),
     outputTokenLimit,
     inputTokenCap: normalizeOptionalInputTokenCap(value?.inputTokenCap),
+    ...(loadTimeoutSeconds ? { loadTimeoutSeconds } : {}),
     ...(inputMode ? { inputMode } : {}),
     ...(profileOverride ? { profileOverride } : {}),
   };
@@ -618,6 +630,7 @@ function normalizeGroupModel(
     temperature?: unknown;
     outputTokenLimit?: unknown;
     inputTokenCap?: unknown;
+    loadTimeoutSeconds?: unknown;
     inputMode?: unknown;
     providerProtocol?: unknown;
     profileOverride?: unknown;
@@ -632,6 +645,10 @@ function normalizeGroupModel(
         ? { mode: "auto" }
         : rawModel.outputTokenLimit,
       inputTokenCap: rawModel.inputTokenCap as number | string | undefined,
+      loadTimeoutSeconds: rawModel.loadTimeoutSeconds as
+        | number
+        | string
+        | undefined,
       inputMode: rawModel.inputMode,
       profileOverride: rawModel.profileOverride,
     },
@@ -1180,3 +1197,33 @@ export function getCodexDirectProviderGroup(): CodexDirectProviderGroup | null {
 export function getModelProviderGroupsPrefKey(): string {
   return MODEL_PROVIDER_GROUPS_PREF_KEY;
 }
+
+/**
+ * The longest load timeout set on any configured model that matches this
+ * model name and endpoint. Internal calls receive the entry's `apiBase`, but a
+ * full endpoint URL under it also matches.
+ */
+export function findModelLoadTimeoutSeconds(params: {
+  apiBase?: string;
+  model?: string;
+}): number | undefined {
+  const modelName = normalizeString(params.model).toLowerCase();
+  if (!modelName) return undefined;
+  const apiBase = normalizeApiBase(params.apiBase || "").toLowerCase();
+  let longest: number | undefined;
+  for (const group of getModelProviderGroups()) {
+    if (group.authMode === "codex_auth" || group.authMode === "webchat") {
+      continue;
+    }
+    const groupBase = normalizeApiBase(group.apiBase).toLowerCase();
+    if (apiBase && groupBase && !apiBase.startsWith(groupBase)) continue;
+    for (const entry of group.models) {
+      if (entry.model.trim().toLowerCase() !== modelName) continue;
+      const seconds = entry.loadTimeoutSeconds;
+      if (seconds && (!longest || seconds > longest)) longest = seconds;
+    }
+  }
+  return longest;
+}
+
+registerModelLoadTimeoutLookup(findModelLoadTimeoutSeconds);
