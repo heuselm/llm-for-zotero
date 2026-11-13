@@ -1,3 +1,7 @@
+> **Fork note (heuselm):** adds an optional per-model **load timeout** for local LLM servers
+> (LM Studio, Ollama) so cold-start model loads are not aborted by the fixed 6–30 s internal budgets.
+> Branch [`feat/expose-llm-timeout-setting`](https://github.com/heuselm/llm-for-zotero/tree/feat/expose-llm-timeout-setting).
+
 # llm-for-zotero: A Research Agent System for your Zotero Library
 
 [![Zotero support](https://img.shields.io/badge/Zotero-supported-green?style=flat-square&logo=zotero&logoColor=CC2936)](https://www.zotero.org)
